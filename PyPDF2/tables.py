@@ -60,7 +60,7 @@ class TextConverter:
                     # table has two or three elements
                     for index in range(0, len(operands), count_el):
                         key = operands[index]
-                        if not isinstance(operands[index], ByteStringObject):
+                        if not isinstance(key, ByteStringObject):
                             key = key.get_original_bytes()
                         key = key.hex()
                         value = operands[index + count_el - 1]
@@ -69,10 +69,12 @@ class TextConverter:
                         value = convert(value)
                         table[key] = value
                         if count_el == 3 and operands[index] != operands[index + 1]:
+                            start = operands[index].get_original_bytes().hex()
+                            end = operands[index+1].get_original_bytes().hex()
                             # иногда указан диапазон значений, поэтому таблицу шрифтов
                             # дополняем динамически
-                            for i in range(ord(operands[index]) + 1, ord(operands[index + 1]) + 2):
-                                key = str(chr(i))
+                            for i in range(int(start, 16) + 1, int(end, 16) + 1):
+                                key = hex(i).split('x')[-1]
                                 value = chr(ord(value) + 1)
                                 table[key] = value
 
@@ -118,7 +120,7 @@ class TextConverter:
             elem_length = len(list(font.keys())[0]) if font else 1
             items = [item[index: index + elem_length] for index in range(0, len(item), elem_length)]
 
-            return ''.join([font.get(item, '?') for item in items if item in font])
+            return ''.join([font.get(item, '?') for item in items])
 
         text = u_("")
         if isinstance(item, TextStringObject):
@@ -172,7 +174,7 @@ class StructuredTable:
         self.table = defaultdict(str)
         self.converter = TextConverter(text_to_hex=False)
 
-        self.process()
+        # self.process()
 
     def set_table_id(self, row):
         # TR tags sometimes don't have tag Pg, then we must finding it in other tags
@@ -213,8 +215,15 @@ class StructuredTable:
                         text += "\n"
                         text += _text
 
-                if last_id is not None:
+                if last_id is not None and text:
                     self.table[last_id] += text
+
+            self.strip_table_spaces()
+
+    def strip_table_spaces(self):
+        if self.table:
+            for key, value in self.table.items():
+                self.table[key] = value.strip()
 
     def get_id(self, data):
         result = None
@@ -308,6 +317,9 @@ class StructuredTable:
         return self.process_td(obj.getObject()) if isinstance(obj, IndirectObject) else None
 
     def show(self):
+        if not self.is_processed():
+            self.process()
+
         if self.caption_id is not None:
             print(self.table.get(self.caption_id, ''))
 
@@ -321,6 +333,9 @@ class StructuredTable:
                 print()
 
     def get_data(self):
+        if not self.is_processed():
+            self.process()
+
         data = []
         if self.rows:
             for row in self.rows:
