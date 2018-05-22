@@ -1,0 +1,1 @@
+qpdf --qdf --object-streams=disable origiin.pdf origin-uncompress.pdf

@@ -4,4 +4,5 @@
 .tox
 build
 .idea/*
+PDF_Samples/files/
 

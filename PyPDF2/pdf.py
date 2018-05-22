@@ -63,8 +63,9 @@ from . import utils
 import warnings
 import codecs
 from .generic import *
-from .utils import readNonWhitespace, readUntilWhitespace, ConvertFunctionsToVirtualList
+from .utils import readNonWhitespace, readUntilWhitespace, ConvertFunctionsToVirtualList, PdfReadError
 from .utils import isString, b_, u_, ord_, chr_, str_, formatWarning
+from .tables import PdfOfficeTableFinder, StructuredTableFinder
 
 if version_info < ( 2, 4 ):
    from sets import ImmutableSet as frozenset
@@ -1239,6 +1240,40 @@ class PdfFileReader(object):
         if self.flattenedPages == None:
             self._flatten()
         return self.flattenedPages[pageNumber]
+
+    ########################################--tables--########################################
+
+    def is_table_without_structure(self):
+        for num in range(self.getNumPages()):
+            page = self.getPage(num)
+            content = page["/Contents"].getObject()
+            if not isinstance(content, ContentStream):
+                content = ContentStream(content, page)
+
+            for operands, operator in content.operations:
+                if operator == b_("re"):
+                    return True
+        return False
+
+    def search_tables(self):
+        catalog = self.trailer["/Root"].getObject()
+        tables = []
+
+        if "/StructTreeRoot" in catalog:
+            root = catalog.get('/StructTreeRoot').getObject()
+
+            finder = StructuredTableFinder(root)
+            tables = finder.search()
+
+        elif self.is_table_without_structure():
+            finder = PdfOfficeTableFinder(self)
+            tables = finder.search()
+        else:
+            print('no tables found')
+
+        return tables
+
+    ################################################################################
 
     namedDestinations = property(lambda self:
                                   self.getNamedDestinations(), None, None)
